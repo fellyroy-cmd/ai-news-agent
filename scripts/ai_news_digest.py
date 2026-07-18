@@ -8,6 +8,7 @@ Run: python scripts/ai_news_digest.py
 import os
 import sys
 import json
+import socket
 import datetime
 import xml.etree.ElementTree as ET
 from urllib.request import urlopen, Request
@@ -61,14 +62,22 @@ def truncate(text: str, max_chars: int = 200) -> str:
 # ── RSS Parser ───────────────────────────────────────────────────────────────
 
 def fetch_feed(feed: dict) -> list[dict]:
-    """Fetch and parse an RSS feed. Returns list of article dicts."""
+    """Fetch and parse an RSS feed. Returns list of article dicts.
+
+    One feed being down, slow, or serving malformed XML should never crash
+    the whole run — we log the failure and move on to the next source.
+    """
     headers = {"User-Agent": "Mozilla/5.0 (compatible; DaraNewsBot/1.0)"}
     try:
         req = Request(feed["url"], headers=headers)
         with urlopen(req, timeout=10) as resp:
             data = resp.read()
         root = ET.fromstring(data)
-    except (URLError, ET.ParseError) as e:
+    except (URLError, socket.timeout, ET.ParseError, ValueError) as e:
+        # URLError: unreachable/DNS/HTTP errors. socket.timeout: feed hangs
+        # past the 10s limit (this is NOT a URLError, so it needs its own
+        # case). ET.ParseError: feed returned broken/non-XML content.
+        # ValueError: catches other unexpected malformed-response cases.
         print(f"  [skip] {feed['name']}: {e}")
         return []
 
@@ -226,9 +235,12 @@ def main():
     print("Fetching AI news...\n")
 
     all_articles = []
+    failed_feeds = []
     for feed in FEEDS:
         print(f"  Fetching: {feed['name']}")
         articles = fetch_feed(feed)
+        if not articles:
+            failed_feeds.append(feed["name"])
         all_articles.extend(articles)
         print(f"    -> {len(articles)} stories")
 
@@ -237,6 +249,8 @@ def main():
         sys.exit(1)
 
     print(f"\nTotal stories collected: {len(all_articles)}")
+    if failed_feeds:
+        print(f"Skipped {len(failed_feeds)} feed(s) that errored or returned nothing: {', '.join(failed_feeds)}")
 
     # Determine output directory relative to script location
     script_dir = os.path.dirname(os.path.abspath(__file__))
