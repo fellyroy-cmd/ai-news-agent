@@ -45,7 +45,31 @@ cd ai-news-agent
 python scripts/ai_news_digest.py
 ```
 
-No dependencies beyond the Python standard library right now — v1 uses only `urllib` and `xml.etree` for RSS parsing. The Claude API step (v2) will need an `ANTHROPIC_API_KEY` in a local `.env` file (not committed — see `.gitignore`).
+v1 (`ai_news_digest.py`) has no dependencies beyond the Python standard library — just `urllib` and `xml.etree` for RSS parsing.
+
+The Claude API scripts (`hello_claude.py` and everything in v2 from here on) need:
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env   # then paste your real ANTHROPIC_API_KEY into .env
+python scripts/hello_claude.py
+```
+
+`.env` is gitignored — your key never gets committed.
+
+## v2 progress
+
+- [x] Fetch RSS (v1)
+- [x] First Claude API call — `scripts/hello_claude.py` loads a key from `.env` and summarizes one hardcoded paragraph. Proves the API connection works before it gets wired into the real pipeline.
+- [ ] Rank fetched headlines by relevance (Week 2)
+- [ ] Summarize each story in Dara's voice (Week 3)
+- [ ] Assemble the newsletter draft (Week 4)
+
+Try it (needs an `ANTHROPIC_API_KEY` — see Setup below):
+
+```bash
+python scripts/hello_claude.py
+```
 
 ## Status
 
