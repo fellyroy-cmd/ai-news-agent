@@ -78,6 +78,17 @@ No API key yet? Test the ranking logic offline — no key, no network, no cost:
 python scripts/rank_stories.py --dry-run
 ```
 
+## Running the tests
+
+The prompt-building, JSON-parsing, and RSS-cleanup logic all have real automated tests — no API key or network needed to run them:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -v
+```
+
+26 tests as of Week 2, covering: prompt construction, malformed/fenced JSON handling from Claude, HTML stripping, text truncation, and duplicate-story detection across feeds. `fetch_feed()` itself (the live HTTP call) isn't unit-tested — it's proven instead by actually running `ai_news_digest.py`, since mocking a real RSS response would test the mock, not the internet.
+
 ## Status
 
 Week 2 of 4 — ranking. Follow the build on YouTube: "I Automated My Entire AI Newsletter With Python (as a Non-Coder)."
