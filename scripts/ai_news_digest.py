@@ -126,6 +126,43 @@ def fetch_feed(feed: dict) -> list[dict]:
     return items
 
 
+# ── Deduplication ────────────────────────────────────────────────────────────
+
+def normalize_title(title: str) -> str:
+    """Lowercase a title and strip punctuation so near-identical headlines
+    from different feeds compare equal, e.g. 'OpenAI Launches GPT-5!' and
+    'OpenAI launches GPT-5' both become 'openai launches gpt5'.
+    """
+    return "".join(ch for ch in title.lower() if ch.isalnum() or ch.isspace()).strip()
+
+
+def deduplicate_articles(articles: list[dict]) -> list[dict]:
+    """Drop repeat stories that show up on more than one feed.
+
+    Big AI announcements (a new model, a funding round) often get covered by
+    several of our 9 sources on the same day. Without this, the digest shows
+    the same headline 2-3 times. We keep the FIRST copy we see (feeds are
+    fetched in the order listed in FEEDS) and skip the rest.
+    """
+    seen_titles = set()
+    unique_articles = []
+    duplicates_dropped = 0
+
+    for article in articles:
+        key = normalize_title(article["title"])
+        if key in seen_titles:
+            duplicates_dropped += 1
+            continue
+        seen_titles.add(key)
+        unique_articles.append(article)
+
+    if duplicates_dropped:
+        print(f"Removed {duplicates_dropped} duplicate stor{'y' if duplicates_dropped == 1 else 'ies'} "
+              f"covered by more than one feed.")
+
+    return unique_articles
+
+
 # ── Content Ideas Generator ──────────────────────────────────────────────────
 
 def generate_content_ideas(articles: list[dict]) -> list[str]:
@@ -251,6 +288,9 @@ def main():
     print(f"\nTotal stories collected: {len(all_articles)}")
     if failed_feeds:
         print(f"Skipped {len(failed_feeds)} feed(s) that errored or returned nothing: {', '.join(failed_feeds)}")
+
+    all_articles = deduplicate_articles(all_articles)
+    print(f"Stories after removing duplicates: {len(all_articles)}")
 
     # Determine output directory relative to script location
     script_dir = os.path.dirname(os.path.abspath(__file__))
