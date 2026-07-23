@@ -59,9 +59,9 @@ python scripts/hello_claude.py
 
 ## v2 progress
 
-- [x] Fetch RSS (v1)
+- [x] Fetch RSS (v1) — now with duplicate detection when the same story runs on more than one feed
 - [x] First Claude API call — `scripts/hello_claude.py` loads a key from `.env` and summarizes one hardcoded paragraph. Proves the API connection works before it gets wired into the real pipeline.
-- [ ] Rank fetched headlines by relevance (Week 2)
+- [x] Rank fetched headlines by relevance — `scripts/rank_stories.py` sends every fetched story to Claude and gets back the top 5, each with a 1-10 relevance score and a one-line reason, as structured JSON.
 - [ ] Summarize each story in Dara's voice (Week 3)
 - [ ] Assemble the newsletter draft (Week 4)
 
@@ -69,8 +69,15 @@ Try it (needs an `ANTHROPIC_API_KEY` — see Setup below):
 
 ```bash
 python scripts/hello_claude.py
+python scripts/rank_stories.py
+```
+
+No API key yet? Test the ranking logic offline — no key, no network, no cost:
+
+```bash
+python scripts/rank_stories.py --dry-run
 ```
 
 ## Status
 
-Week 1 of 4 — foundations. Follow the build on YouTube: "I Automated My Entire AI Newsletter With Python (as a Non-Coder)."
+Week 2 of 4 — ranking. Follow the build on YouTube: "I Automated My Entire AI Newsletter With Python (as a Non-Coder)."
