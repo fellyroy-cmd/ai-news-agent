@@ -105,6 +105,38 @@ def parse_ranking_response(raw_text: str) -> list[dict]:
     return data["rankings"]
 
 
+def _coerce_score(value) -> int:
+    """Turn whatever Claude put in relevance_score into an int we can sort by.
+
+    The prompt asks for an integer, but models sometimes hand back "9"
+    (a string) or 9.0 (a float). Both are fine and get normalized. Only
+    genuinely non-numeric garbage ("high") raises — better to surface that
+    loudly than to silently sort it as zero.
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            raise ValueError(f"relevance_score isn't a number: {value!r}")
+
+
+def finalize_rankings(rankings: list[dict]) -> list[dict]:
+    """Enforce the top-N contract in code instead of trusting the model.
+
+    The prompt asks Claude for "exactly TOP_N entries, sorted highest score
+    first" — but a prompt is a request, not a guarantee. Claude might return
+    six entries, or return them out of order. This normalizes each score to
+    an int, sorts highest-first, and caps the result at TOP_N so downstream
+    code (the newsletter builder) always gets exactly what it expects.
+    """
+    for entry in rankings:
+        entry["relevance_score"] = _coerce_score(entry["relevance_score"])
+    ranked = sorted(rankings, key=lambda e: e["relevance_score"], reverse=True)
+    return ranked[:TOP_N]
+
+
 def rank_stories(stories: list[dict]) -> list[dict]:
     """Send fetched stories to Claude, return the top N ranked with scores.
 
@@ -128,6 +160,7 @@ def rank_stories(stories: list[dict]) -> list[dict]:
 
     raw_text = response.content[0].text
     rankings = parse_ranking_response(raw_text)
+    rankings = finalize_rankings(rankings)  # sort highest-first, cap to TOP_N
 
     # Attach the full original story dict (link, date, etc.) back onto each
     # ranking so downstream code (Week 3 summarization, Week 4 newsletter)
@@ -187,6 +220,7 @@ def run_dry_run():
 
     print("Parsing a sample fenced JSON response (proves fence-stripping works)...\n")
     rankings = parse_ranking_response(fake_response)
+    rankings = finalize_rankings(rankings)  # sort highest-first, cap to TOP_N
 
     for entry in rankings:
         idx = entry["story_number"] - 1

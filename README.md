@@ -61,7 +61,7 @@ python scripts/hello_claude.py
 
 - [x] Fetch RSS (v1) — now with duplicate detection when the same story runs on more than one feed
 - [x] First Claude API call — `scripts/hello_claude.py` loads a key from `.env` and summarizes one hardcoded paragraph. Proves the API connection works before it gets wired into the real pipeline.
-- [x] Rank fetched headlines by relevance — `scripts/rank_stories.py` sends every fetched story to Claude and gets back the top 5, each with a 1-10 relevance score and a one-line reason, as structured JSON.
+- [x] Rank fetched headlines by relevance — `scripts/rank_stories.py` sends every fetched story to Claude and gets back the top 5, each with a 1-10 relevance score and a one-line reason, as structured JSON. The "top 5, highest first" shape is enforced in code (sort + cap), not just requested in the prompt — a prompt is a request, not a guarantee.
 - [ ] Summarize each story in Dara's voice (Week 3)
 - [ ] Assemble the newsletter draft (Week 4)
 
@@ -87,7 +87,7 @@ pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-26 tests as of Week 2, covering: prompt construction, malformed/fenced JSON handling from Claude, HTML stripping, text truncation, and duplicate-story detection across feeds. `fetch_feed()` itself (the live HTTP call) isn't unit-tested — it's proven instead by actually running `ai_news_digest.py`, since mocking a real RSS response would test the mock, not the internet.
+30 tests as of Week 2, covering: prompt construction, malformed/fenced JSON handling from Claude, score normalization and the enforced top-N sort/cap, HTML stripping, text truncation, and duplicate-story detection across feeds. `fetch_feed()` itself (the live HTTP call) isn't unit-tested — it's proven instead by actually running `ai_news_digest.py`, since mocking a real RSS response would test the mock, not the internet.
 
 ## Status
 

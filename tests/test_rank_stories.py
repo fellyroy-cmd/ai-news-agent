@@ -22,7 +22,12 @@ import pytest
 # Make scripts/ importable without installing the project as a package.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from rank_stories import build_ranking_prompt, parse_ranking_response, TOP_N
+from rank_stories import (
+    build_ranking_prompt,
+    parse_ranking_response,
+    finalize_rankings,
+    TOP_N,
+)
 
 
 SAMPLE_STORIES = [
@@ -121,3 +126,38 @@ def test_top_n_constant_is_a_positive_int():
     # the prompt would silently ask Claude for a nonsensical number of results.
     assert isinstance(TOP_N, int)
     assert TOP_N > 0
+
+
+# ── finalize_rankings() ──────────────────────────────────────────────────────
+# These enforce the top-N-sorted contract in code, instead of trusting Claude
+# to obey "return exactly TOP_N entries, sorted highest score first."
+
+def _entry(score, title="x"):
+    return {"story_number": 1, "title": title, "relevance_score": score, "reason": "r"}
+
+
+def test_finalize_sorts_by_score_highest_first():
+    # Deliberately out of order — Claude might return them this way.
+    out = finalize_rankings([_entry(3), _entry(9), _entry(6)])
+    assert [e["relevance_score"] for e in out] == [9, 6, 3]
+
+
+def test_finalize_caps_to_top_n():
+    # More entries than TOP_N (Claude returned too many) → keep only the best.
+    too_many = [_entry(i) for i in range(1, TOP_N + 4)]  # TOP_N + 3 entries
+    out = finalize_rankings(too_many)
+    assert len(out) == TOP_N
+    # The ones kept must be the highest scores.
+    assert min(e["relevance_score"] for e in out) == (TOP_N + 3) - TOP_N + 1
+
+
+def test_finalize_coerces_string_and_float_scores():
+    # "8" (string) and 7.0 (float) should normalize to ints and sort correctly.
+    out = finalize_rankings([_entry("8"), _entry(7.0), _entry(9)])
+    assert [e["relevance_score"] for e in out] == [9, 8, 7]
+    assert all(isinstance(e["relevance_score"], int) for e in out)
+
+
+def test_finalize_raises_on_non_numeric_score():
+    with pytest.raises(ValueError):
+        finalize_rankings([_entry("high")])
