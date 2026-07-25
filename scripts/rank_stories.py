@@ -98,6 +98,10 @@ def parse_ranking_response(raw_text: str) -> list[dict]:
         raise ValueError(f"JSON parsed but missing a 'rankings' list. Got: {data}")
 
     for entry in data["rankings"]:
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"Ranking entry wasn't a JSON object (got {type(entry).__name__}): {entry!r}"
+            )
         missing = {"story_number", "title", "relevance_score", "reason"} - entry.keys()
         if missing:
             raise ValueError(f"Ranking entry missing field(s) {missing}: {entry}")

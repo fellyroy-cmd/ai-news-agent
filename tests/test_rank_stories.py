@@ -114,6 +114,16 @@ def test_rejects_ranking_entry_missing_a_required_field():
         parse_ranking_response(json.dumps(broken))
 
 
+def test_rejects_ranking_entry_that_isnt_a_json_object():
+    # If Claude ever returns "rankings": ["some string", ...] instead of a
+    # list of objects, entry.keys() would previously crash with a raw
+    # AttributeError instead of the clear ValueError every other malformed
+    # case in this file raises. This proves the same clear error applies here.
+    broken = {"rankings": ["not an object"]}
+    with pytest.raises(ValueError, match="wasn't a JSON object"):
+        parse_ranking_response(json.dumps(broken))
+
+
 def test_error_message_includes_raw_response_for_debugging():
     # A bad response should be easy to diagnose from the error alone.
     bad = "not json at all"
