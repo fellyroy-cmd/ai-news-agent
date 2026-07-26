@@ -171,3 +171,21 @@ def test_finalize_coerces_string_and_float_scores():
 def test_finalize_raises_on_non_numeric_score():
     with pytest.raises(ValueError):
         finalize_rankings([_entry("high")])
+
+
+def test_finalize_coerces_string_and_float_story_numbers():
+    # Claude sometimes echoes the story number back as "1" (string) or 1.0
+    # (float). Both must normalize to an int, because rank_stories() and
+    # run_dry_run() do `story_number - 1` to look the story back up — and
+    # "1" - 1 is a raw TypeError, not a clear error.
+    a = {"story_number": "1", "title": "x", "relevance_score": 9, "reason": "r"}
+    b = {"story_number": 2.0, "title": "y", "relevance_score": 5, "reason": "r"}
+    out = finalize_rankings([a, b])
+    assert all(isinstance(e["story_number"], int) for e in out)
+    assert [e["story_number"] for e in out] == [1, 2]
+
+
+def test_finalize_raises_on_non_numeric_story_number():
+    bad = {"story_number": "first", "title": "x", "relevance_score": 9, "reason": "r"}
+    with pytest.raises(ValueError, match="story_number isn't a number"):
+        finalize_rankings([bad])
