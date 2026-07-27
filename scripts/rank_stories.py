@@ -163,6 +163,30 @@ def finalize_rankings(rankings: list[dict]) -> list[dict]:
     return ranked[:TOP_N]
 
 
+def attach_stories(rankings: list[dict], stories: list[dict]) -> list[dict]:
+    """Attach each ranking's full original story dict back onto it.
+
+    Claude only echoes a story's number and title back in its ranking.
+    Downstream code (Week 3 summarization, Week 4 newsletter) needs the
+    whole original story — its link, date, source, summary — to write about
+    it. This looks each ranking's story_number back up in the fetched list
+    (the prompt numbers stories 1-based, so subtract 1 to index) and stores
+    the match under entry["story"].
+
+    A story_number that's out of range — Claude referenced a story that
+    isn't in the list — is skipped rather than crashing. That's the exact
+    behavior both call sites already had; the point of pulling it into one
+    function is that rank_stories() and run_dry_run() had this loop copied
+    verbatim, and two copies that must stay identical eventually drift apart.
+    Mutates and returns the same list for convenience.
+    """
+    for entry in rankings:
+        idx = entry["story_number"] - 1
+        if 0 <= idx < len(stories):
+            entry["story"] = stories[idx]
+    return rankings
+
+
 def rank_stories(stories: list[dict]) -> list[dict]:
     """Send fetched stories to Claude, return the top N ranked with scores.
 
@@ -191,10 +215,7 @@ def rank_stories(stories: list[dict]) -> list[dict]:
     # Attach the full original story dict (link, date, etc.) back onto each
     # ranking so downstream code (Week 3 summarization, Week 4 newsletter)
     # has everything in one place, not just the number/title Claude echoed.
-    for entry in rankings:
-        idx = entry["story_number"] - 1
-        if 0 <= idx < len(stories):
-            entry["story"] = stories[idx]
+    rankings = attach_stories(rankings, stories)
 
     return rankings
 
@@ -247,11 +268,7 @@ def run_dry_run():
     print("Parsing a sample fenced JSON response (proves fence-stripping works)...\n")
     rankings = parse_ranking_response(fake_response)
     rankings = finalize_rankings(rankings)  # sort highest-first, cap to TOP_N
-
-    for entry in rankings:
-        idx = entry["story_number"] - 1
-        if 0 <= idx < len(SAMPLE_STORIES):
-            entry["story"] = SAMPLE_STORIES[idx]
+    attach_stories(rankings, SAMPLE_STORIES)  # same helper the real path uses
 
     print(f"Parsed {len(rankings)} ranked stories:\n")
     for r in rankings:

@@ -26,6 +26,7 @@ from rank_stories import (
     build_ranking_prompt,
     parse_ranking_response,
     finalize_rankings,
+    attach_stories,
     TOP_N,
 )
 
@@ -189,3 +190,30 @@ def test_finalize_raises_on_non_numeric_story_number():
     bad = {"story_number": "first", "title": "x", "relevance_score": 9, "reason": "r"}
     with pytest.raises(ValueError, match="story_number isn't a number"):
         finalize_rankings([bad])
+
+
+# ── attach_stories() ─────────────────────────────────────────────────────────
+# rank_stories() and run_dry_run() used to have this same lookup loop copied
+# verbatim; it now lives in one helper so the two can't drift apart. These
+# pin down the two behaviors that matter: it attaches the right story, and it
+# skips (doesn't crash on) a story_number that's out of range.
+
+def test_attach_stories_maps_number_to_the_right_story():
+    # story_number is 1-based (matches how the prompt numbers them), so
+    # story_number 2 must attach the SECOND story in the list.
+    rankings = [
+        {"story_number": 1, "title": "x", "relevance_score": 9, "reason": "r"},
+        {"story_number": 2, "title": "y", "relevance_score": 5, "reason": "r"},
+    ]
+    attach_stories(rankings, SAMPLE_STORIES)
+    assert rankings[0]["story"] is SAMPLE_STORIES[0]
+    assert rankings[1]["story"] is SAMPLE_STORIES[1]
+
+
+def test_attach_stories_skips_out_of_range_number_without_crashing():
+    # If Claude references a story_number that isn't in the fetched list
+    # (here 99, with only 2 stories), that entry is left without a "story"
+    # key rather than crashing — matching the original inline behavior.
+    rankings = [{"story_number": 99, "title": "x", "relevance_score": 9, "reason": "r"}]
+    attach_stories(rankings, SAMPLE_STORIES)
+    assert "story" not in rankings[0]

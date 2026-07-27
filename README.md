@@ -87,7 +87,7 @@ pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-31 tests as of Week 2, covering: prompt construction, malformed/fenced/non-object JSON handling from Claude, score normalization and the enforced top-N sort/cap, HTML stripping, text truncation, and duplicate-story detection across feeds. `fetch_feed()` itself (the live HTTP call) isn't unit-tested — it's proven instead by actually running `ai_news_digest.py`, since mocking a real RSS response would test the mock, not the internet.
+35 tests as of Week 2, covering: prompt construction, malformed/fenced/non-object JSON handling from Claude, score and story-number normalization, the enforced top-N sort/cap, attaching each ranking back to its original story (incl. skipping out-of-range numbers), HTML stripping, text truncation, and duplicate-story detection across feeds. `fetch_feed()` itself (the live HTTP call) isn't unit-tested — it's proven instead by actually running `ai_news_digest.py`, since mocking a real RSS response would test the mock, not the internet.
 
 ## Status
 
