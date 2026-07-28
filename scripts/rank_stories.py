@@ -71,6 +71,25 @@ Respond with ONLY valid JSON, no other text, in exactly this shape:
 Return exactly {TOP_N} entries in "rankings", sorted highest score first."""
 
 
+def strip_code_fences(text: str) -> str:
+    """Remove a leading ```json / ``` fence (and its closing ```) if present.
+
+    Models are told to return ONLY JSON but sometimes wrap it in a markdown
+    code fence anyway. Pulled out of parse_ranking_response() so the Week 3
+    summarization parser can share the exact same fence handling instead of
+    copy-pasting it — one behavior, one place (the lesson from 2026-07-27).
+    If there's no fence, the (stripped) text is returned unchanged.
+    """
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        lines = lines[1:]  # drop opening fence (``` or ```json)
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]  # drop closing fence
+        text = "\n".join(lines).strip()
+    return text
+
+
 def parse_ranking_response(raw_text: str) -> list[dict]:
     """Pull the rankings list out of Claude's response text.
 
@@ -79,15 +98,7 @@ def parse_ranking_response(raw_text: str) -> list[dict]:
     be clean JSON as-is. This strips common wrapping before parsing, and
     raises a clear error (instead of a cryptic one) if the shape is wrong.
     """
-    text = raw_text.strip()
-
-    # Strip markdown code fences if present, e.g. ```json ... ```
-    if text.startswith("```"):
-        lines = text.split("\n")
-        lines = lines[1:]  # drop opening fence (``` or ```json)
-        if lines and lines[-1].strip().startswith("```"):
-            lines = lines[:-1]  # drop closing fence
-        text = "\n".join(lines).strip()
+    text = strip_code_fences(raw_text)
 
     try:
         data = json.loads(text)

@@ -62,7 +62,7 @@ python scripts/hello_claude.py
 - [x] Fetch RSS (v1) — now with duplicate detection when the same story runs on more than one feed
 - [x] First Claude API call — `scripts/hello_claude.py` loads a key from `.env` and summarizes one hardcoded paragraph. Proves the API connection works before it gets wired into the real pipeline.
 - [x] Rank fetched headlines by relevance — `scripts/rank_stories.py` sends every fetched story to Claude and gets back the top 5, each with a 1-10 relevance score and a one-line reason, as structured JSON. The "top 5, highest first" shape is enforced in code (sort + cap), not just requested in the prompt — a prompt is a request, not a guarantee.
-- [ ] Summarize each story in Dara's voice (Week 3)
+- [x] Summarize each story in Dara's voice (Week 3) — `scripts/summarize_stories.py` takes the top-ranked stories and asks Claude for a 2-3 sentence plain-language summary plus a "why it matters" takeaway per story, with the `brand/voice.md` rules baked into the prompt so the output sounds like me, not a news wire. Shares the ranker's fence-handling helper rather than copy-pasting it.
 - [ ] Assemble the newsletter draft (Week 4)
 
 Try it (needs an `ANTHROPIC_API_KEY` — see Setup below):
@@ -70,12 +70,14 @@ Try it (needs an `ANTHROPIC_API_KEY` — see Setup below):
 ```bash
 python scripts/hello_claude.py
 python scripts/rank_stories.py
+python scripts/summarize_stories.py   # ranks today's news, then summarizes the top picks in my voice
 ```
 
-No API key yet? Test the ranking logic offline — no key, no network, no cost:
+No API key yet? Test the ranking and summarization logic offline — no key, no network, no cost:
 
 ```bash
 python scripts/rank_stories.py --dry-run
+python scripts/summarize_stories.py --dry-run
 ```
 
 ## Running the tests
@@ -87,8 +89,8 @@ pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-35 tests as of Week 2, covering: prompt construction, malformed/fenced/non-object JSON handling from Claude, score and story-number normalization, the enforced top-N sort/cap, attaching each ranking back to its original story (incl. skipping out-of-range numbers), HTML stripping, text truncation, and duplicate-story detection across feeds. `fetch_feed()` itself (the live HTTP call) isn't unit-tested — it's proven instead by actually running `ai_news_digest.py`, since mocking a real RSS response would test the mock, not the internet.
+49 tests as of Week 3, covering: prompt construction (ranking + summarization), malformed/fenced/non-object JSON handling from Claude, score and story-number normalization, the enforced top-N sort/cap, attaching each ranking back to its original story (incl. skipping out-of-range numbers), the summary prompt carrying the brand voice + story details, the summary parser accepting good JSON and rejecting missing fields, HTML stripping, text truncation, and duplicate-story detection across feeds. `fetch_feed()` itself (the live HTTP call) isn't unit-tested — it's proven instead by actually running `ai_news_digest.py`, since mocking a real RSS response would test the mock, not the internet.
 
 ## Status
 
-Week 2 of 4 — ranking. Follow the build on YouTube: "I Automated My Entire AI Newsletter With Python (as a Non-Coder)."
+Week 3 of 4 — summarization in my voice. Follow the build on YouTube: "I Automated My Entire AI Newsletter With Python (as a Non-Coder)."
