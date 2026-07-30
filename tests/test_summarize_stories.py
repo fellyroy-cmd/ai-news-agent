@@ -128,3 +128,36 @@ def test_rejects_missing_why_it_matters_field():
 def test_error_message_includes_raw_response_for_debugging():
     with pytest.raises(ValueError, match="not json at all"):
         parse_summary_response("not json at all")
+
+
+# ── value validation: a present key isn't enough, it must be usable ──────────
+
+def test_rejects_empty_summary_string():
+    # "summary": "" passes the key-exists check but would land as a blank blurb
+    # in the newsletter — reject it here instead.
+    with pytest.raises(ValueError, match="summary"):
+        parse_summary_response(json.dumps({"summary": "", "why_it_matters": "real"}))
+
+
+def test_rejects_whitespace_only_why_it_matters():
+    with pytest.raises(ValueError, match="why_it_matters"):
+        parse_summary_response(json.dumps({"summary": "real", "why_it_matters": "   "}))
+
+
+def test_rejects_null_field_value():
+    # A JSON null becomes Python None — a present key with an unusable value.
+    with pytest.raises(ValueError, match="summary"):
+        parse_summary_response(json.dumps({"summary": None, "why_it_matters": "real"}))
+
+
+def test_rejects_non_string_field_value():
+    # A model returning a list/number for a field shouldn't slip through.
+    with pytest.raises(ValueError, match="why_it_matters"):
+        parse_summary_response(json.dumps({"summary": "real", "why_it_matters": ["a", "b"]}))
+
+
+def test_strips_surrounding_whitespace_from_values():
+    padded = {"summary": "  clean summary  ", "why_it_matters": "\nclean takeaway\n"}
+    blurb = parse_summary_response(json.dumps(padded))
+    assert blurb["summary"] == "clean summary"
+    assert blurb["why_it_matters"] == "clean takeaway"

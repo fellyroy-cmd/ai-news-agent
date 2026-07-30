@@ -92,9 +92,25 @@ def parse_summary_response(raw_text: str) -> dict:
     if missing:
         raise ValueError(f"Summary missing field(s) {missing}: {data}")
 
+    # A key being present isn't enough — its value has to be usable. A model
+    # can hand back "summary": "" (blank), null, or even a list, all of which
+    # pass the "key exists" check above but would land as a broken or empty
+    # blurb in the send-ready newsletter. Same posture as finalize_rankings()
+    # pinning the top-N contract in code: don't trust the shape, enforce it.
+    for field in ("summary", "why_it_matters"):
+        value = data[field]
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"Summary field {field!r} must be a non-empty string, got: {value!r}"
+            )
+
     # Return only the two fields we rely on, so a chatty model that adds extra
-    # keys can't leak surprise data into the newsletter step.
-    return {"summary": data["summary"], "why_it_matters": data["why_it_matters"]}
+    # keys can't leak surprise data into the newsletter step. Strip so trailing
+    # whitespace from the model doesn't ride along into the draft.
+    return {
+        "summary": data["summary"].strip(),
+        "why_it_matters": data["why_it_matters"].strip(),
+    }
 
 
 def summarize_story(story: dict) -> dict:
