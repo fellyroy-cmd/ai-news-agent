@@ -22,9 +22,11 @@ import pytest
 # Make scripts/ importable without installing the project as a package.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+import summarize_stories
 from summarize_stories import (
     build_summary_prompt,
     parse_summary_response,
+    summarize_rankings,
     BRAND_VOICE,
 )
 
@@ -161,3 +163,51 @@ def test_strips_surrounding_whitespace_from_values():
     blurb = parse_summary_response(json.dumps(padded))
     assert blurb["summary"] == "clean summary"
     assert blurb["why_it_matters"] == "clean takeaway"
+
+
+# ── summarize_rankings(): one bad story must not kill the whole batch ─────────
+# These monkeypatch summarize_story so no API call or network is ever made —
+# we're testing the batch-resilience layer, not the single-story call.
+
+GOOD_BLURB = {"summary": "s", "why_it_matters": "w"}
+
+
+def test_summarize_rankings_attaches_a_blurb_to_every_story(monkeypatch):
+    monkeypatch.setattr(summarize_stories, "summarize_story", lambda story: GOOD_BLURB)
+    rankings = [{"title": "A"}, {"title": "B"}]
+    out = summarize_rankings(rankings)
+    assert all(r["blurb"] == GOOD_BLURB for r in out)
+    assert all(r["blurb_error"] is None for r in out)
+
+
+def test_summarize_rankings_survives_one_failed_story(monkeypatch):
+    # The whole point of tonight's change: a single malformed blurb should NOT
+    # throw away the other stories' good summaries or crash the send-ready run.
+    def flaky(story):
+        if story["title"] == "bad":
+            raise ValueError("Claude returned garbage for this one")
+        return GOOD_BLURB
+
+    monkeypatch.setattr(summarize_stories, "summarize_story", flaky)
+    rankings = [{"title": "good1"}, {"title": "bad"}, {"title": "good2"}]
+    out = summarize_rankings(rankings)
+
+    # The two good stories still get real blurbs.
+    assert out[0]["blurb"] == GOOD_BLURB
+    assert out[2]["blurb"] == GOOD_BLURB
+    # The bad one is flagged (not silently dropped, not a crash).
+    assert out[1]["blurb"] is None
+    assert "garbage" in out[1]["blurb_error"]
+
+
+def test_summarize_rankings_does_not_raise_when_every_story_fails(monkeypatch):
+    # Even a total wipe-out degrades to flagged gaps rather than an exception,
+    # so main() can still print a draft that shows exactly what needs a manual blurb.
+    def always_fails(story):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(summarize_stories, "summarize_story", always_fails)
+    rankings = [{"title": "A"}, {"title": "B"}]
+    out = summarize_rankings(rankings)  # must not raise
+    assert all(r["blurb"] is None for r in out)
+    assert all(r["blurb_error"] == "boom" for r in out)

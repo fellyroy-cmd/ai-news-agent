@@ -143,10 +143,27 @@ def summarize_rankings(rankings: list[dict]) -> list[dict]:
     newsletter builder has everything it needs in one place. If an entry has no
     attached "story" (e.g. a hand-built test entry), we fall back to the entry
     itself, which carries the title. Mutates and returns the same list.
+
+    Batch resilience — the counterpart to the parser's "fail loud": one story's
+    blurb coming back malformed (a bad API response, a shape parse_summary_response
+    rejects) must NOT kill the whole run. Friday's draft is better with four good
+    blurbs and one clearly-flagged gap than a hard crash and no draft at all. So a
+    failed story gets blurb=None plus a human-readable blurb_error naming what went
+    wrong — visible, not silently dropped — and the batch keeps going. Fail loud on
+    the ONE value you're parsing; degrade gracefully when ONE item in a batch fails.
     """
     for entry in rankings:
         story = entry.get("story", entry)
-        entry["blurb"] = summarize_story(story)
+        try:
+            entry["blurb"] = summarize_story(story)
+            entry["blurb_error"] = None
+        except Exception as e:
+            # Broad on purpose: at the batch layer, ANY failure on one story
+            # (parse error, rate limit, network blip) should isolate to that
+            # story, not abort the send-ready run. We record the reason rather
+            # than swallow it, so nothing fails silently.
+            entry["blurb"] = None
+            entry["blurb_error"] = str(e)
     return rankings
 
 
@@ -235,10 +252,17 @@ def main():
         print(f"Summarization failed: {e}")
         sys.exit(1)
 
-    print(f"Top {len(rankings)} stories, summarized in Dara's voice:\n")
+    failed = [r for r in rankings if r["blurb"] is None]
+    ok = len(rankings) - len(failed)
+    header = f"Summarized {ok} of {len(rankings)} top stories in Dara's voice"
+    header += f" ({len(failed)} need a manual blurb):\n" if failed else ":\n"
+    print(header)
     for r in rankings:
         blurb = r["blurb"]
         print(f"  [{r['relevance_score']}/10] {r['title']}")
+        if blurb is None:
+            print(f"     [!] Summary failed — needs a manual blurb: {r['blurb_error']}\n")
+            continue
         print(f"     {blurb['summary']}")
         print(f"     Why it matters: {blurb['why_it_matters']}\n")
 
