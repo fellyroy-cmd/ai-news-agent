@@ -120,13 +120,24 @@ def parse_ranking_response(raw_text: str) -> list[dict]:
     return data["rankings"]
 
 
-def _coerce_score(value) -> int:
-    """Turn whatever Claude put in relevance_score into an int we can sort by.
+def _coerce_int(value, field: str) -> int:
+    """Turn whatever Claude put in a numeric field into a plain int.
 
-    The prompt asks for an integer, but models sometimes hand back "9"
-    (a string) or 9.0 (a float). Both are fine and get normalized. Only
-    genuinely non-numeric garbage ("high") raises — better to surface that
-    loudly than to silently sort it as zero.
+    The prompt asks for integers, but models sometimes hand back "9" (a
+    string) or 9.0 (a float). Both are fine and get normalized. Only
+    genuinely non-numeric garbage ("high", "first") raises — and the error
+    names which field broke, so you get "story_number isn't a number" rather
+    than a cryptic one further downstream.
+
+    Both fields this normalizes matter for a concrete reason:
+      - relevance_score — we sort by it; a string would sort wrong.
+      - story_number    — attach_stories() does `story_number - 1` to look the
+                          original story back up, and `"1" - 1` is a raw
+                          TypeError crash, not a clear error.
+
+    `field` is the JSON key name, used only to make the error message point at
+    the right place. (Merged from the old _coerce_score / _coerce_story_number,
+    which were byte-identical apart from that name — 2026-08-03.)
     """
     try:
         return int(value)
@@ -134,27 +145,7 @@ def _coerce_score(value) -> int:
         try:
             return int(float(value))
         except (TypeError, ValueError):
-            raise ValueError(f"relevance_score isn't a number: {value!r}")
-
-
-def _coerce_story_number(value) -> int:
-    """Turn whatever Claude put in story_number into an int we can index with.
-
-    Same story as _coerce_score: the prompt asks for the number from the list,
-    but models sometimes echo it back as "1" (a string) or 1.0 (a float).
-    Downstream, both rank_stories() and run_dry_run() do `story_number - 1` to
-    look the original story back up — and `"1" - 1` is a raw TypeError crash,
-    not a clear error. Normalizing here means that lookup always gets an int.
-    Genuinely non-numeric garbage ("first") raises loudly instead of crashing
-    later somewhere more confusing.
-    """
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        try:
-            return int(float(value))
-        except (TypeError, ValueError):
-            raise ValueError(f"story_number isn't a number: {value!r}")
+            raise ValueError(f"{field} isn't a number: {value!r}")
 
 
 def finalize_rankings(rankings: list[dict]) -> list[dict]:
@@ -168,8 +159,8 @@ def finalize_rankings(rankings: list[dict]) -> list[dict]:
     expects.
     """
     for entry in rankings:
-        entry["relevance_score"] = _coerce_score(entry["relevance_score"])
-        entry["story_number"] = _coerce_story_number(entry["story_number"])
+        entry["relevance_score"] = _coerce_int(entry["relevance_score"], "relevance_score")
+        entry["story_number"] = _coerce_int(entry["story_number"], "story_number")
     ranked = sorted(rankings, key=lambda e: e["relevance_score"], reverse=True)
     return ranked[:TOP_N]
 

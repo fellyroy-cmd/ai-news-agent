@@ -170,7 +170,10 @@ def test_finalize_coerces_string_and_float_scores():
 
 
 def test_finalize_raises_on_non_numeric_score():
-    with pytest.raises(ValueError):
+    # The error must name the score field, not the story_number field — both
+    # coercions now share one _coerce_int(value, field) helper, so this pins
+    # down that the score call site passes the right field name through.
+    with pytest.raises(ValueError, match="relevance_score isn't a number"):
         finalize_rankings([_entry("high")])
 
 
