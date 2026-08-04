@@ -63,7 +63,7 @@ python scripts/hello_claude.py
 - [x] First Claude API call — `scripts/hello_claude.py` loads a key from `.env` and summarizes one hardcoded paragraph. Proves the API connection works before it gets wired into the real pipeline.
 - [x] Rank fetched headlines by relevance — `scripts/rank_stories.py` sends every fetched story to Claude and gets back the top 5, each with a 1-10 relevance score and a one-line reason, as structured JSON. The "top 5, highest first" shape is enforced in code (sort + cap), not just requested in the prompt — a prompt is a request, not a guarantee.
 - [x] Summarize each story in Dara's voice (Week 3) — `scripts/summarize_stories.py` takes the top-ranked stories and asks Claude for a 2-3 sentence plain-language summary plus a "why it matters" takeaway per story, with the `brand/voice.md` rules baked into the prompt so the output sounds like me, not a news wire. Shares the ranker's fence-handling helper rather than copy-pasting it.
-- [ ] Assemble the newsletter draft (Week 4)
+- [x] Assemble the newsletter draft (Week 4) — `scripts/build_newsletter.py` takes the ranked + voice-summarized stories and fills my newsletter template into a dated draft in `content/newsletter/`. The story section is written for me; the human-touch bits (subject lines, tool of the week, video, Skool) are left as guided TODOs, and any story whose auto-summary failed is flagged inline so nothing gets silently dropped. Still to do before shipping: record the demo GIF and do one real end-to-end run.
 
 Try it (needs an `ANTHROPIC_API_KEY` — see Setup below):
 
@@ -71,6 +71,7 @@ Try it (needs an `ANTHROPIC_API_KEY` — see Setup below):
 python scripts/hello_claude.py
 python scripts/rank_stories.py
 python scripts/summarize_stories.py   # ranks today's news, then summarizes the top picks in my voice
+python scripts/build_newsletter.py    # does all of the above, then writes a send-ready draft to content/newsletter/
 ```
 
 No API key yet? Test the ranking and summarization logic offline — no key, no network, no cost:
@@ -78,6 +79,7 @@ No API key yet? Test the ranking and summarization logic offline — no key, no 
 ```bash
 python scripts/rank_stories.py --dry-run
 python scripts/summarize_stories.py --dry-run
+python scripts/build_newsletter.py --dry-run   # assembles a full draft from canned data
 ```
 
 ## Running the tests
@@ -89,8 +91,8 @@ pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-49 tests as of Week 3, covering: prompt construction (ranking + summarization), malformed/fenced/non-object JSON handling from Claude, score and story-number normalization, the enforced top-N sort/cap, attaching each ranking back to its original story (incl. skipping out-of-range numbers), the summary prompt carrying the brand voice + story details, the summary parser accepting good JSON and rejecting missing fields, HTML stripping, text truncation, and duplicate-story detection across feeds. `fetch_feed()` itself (the live HTTP call) isn't unit-tested — it's proven instead by actually running `ai_news_digest.py`, since mocking a real RSS response would test the mock, not the internet.
+72 tests as of Week 4, covering: prompt construction (ranking + summarization), malformed/fenced/non-object JSON handling from Claude, score and story-number normalization, the enforced top-N sort/cap, attaching each ranking back to its original story (incl. skipping out-of-range numbers), the summary prompt carrying the brand voice + story details, the summary parser accepting good JSON and rejecting missing fields, the newsletter assembly (story blocks carrying title/blurb/link, a failed blurb rendering as a visible manual-gap TODO instead of being dropped, the human-touch sections staying as TODOs, and the draft saving to the dated path), HTML stripping, text truncation, and duplicate-story detection across feeds. `fetch_feed()` itself (the live HTTP call) isn't unit-tested — it's proven instead by actually running `ai_news_digest.py`, since mocking a real RSS response would test the mock, not the internet.
 
 ## Status
 
-Week 3 of 4 — summarization in my voice. Follow the build on YouTube: "I Automated My Entire AI Newsletter With Python (as a Non-Coder)."
+Week 4 of 4 — newsletter assembly. The full fetch → rank → summarize → draft pipeline now runs end to end in code; what's left to ship is one real API run and the demo GIF. Follow the build on YouTube: "I Automated My Entire AI Newsletter With Python (as a Non-Coder)."
