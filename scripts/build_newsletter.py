@@ -36,6 +36,7 @@ ranked+summarized data so you can see exactly what the output looks like:
 
 import datetime
 import os
+import re
 import sys
 
 from dotenv import load_dotenv
@@ -209,6 +210,41 @@ def save_newsletter(text: str, output_dir: str, date=None) -> str:
     return filepath
 
 
+# newsletter-YYYY-MM-DD.md — the exact shape save_newsletter() writes. Used to
+# recognize prior issues on disk (and to ignore anything else that happens to
+# live in the folder).
+NEWSLETTER_FILE = re.compile(r"newsletter-\d{4}-\d{2}-\d{2}\.md")
+
+
+def next_issue_number(output_dir: str, date=None) -> int:
+    """Work out the next issue number by counting prior newsletters on disk.
+
+    The issue number is a FACT — it's just "how many weekly issues came before
+    this one, plus one" — so unlike the tool of the week or the video link, it's
+    something we can (and should) fill in automatically instead of leaving Dara a
+    TODO. Deriving it from the filesystem keeps a single source of truth: the
+    drafts themselves.
+
+    Two edge cases that matter:
+      - No content/newsletter/ yet (or it's empty) → this is issue #1.
+      - Re-running on the SAME day must NOT bump the number. Today's file gets
+        overwritten, not added, so we exclude it from the count — run the script
+        three times on a Friday and it stays issue #N all three times.
+
+    This reads the directory (I/O), so it lives down here with save_newsletter
+    rather than up with the pure renderers, and it's tested with tmp_path.
+    """
+    date = date or datetime.date.today()
+    today_name = f"newsletter-{date.strftime('%Y-%m-%d')}.md"
+    if not os.path.isdir(output_dir):
+        return 1
+    prior = [
+        name for name in os.listdir(output_dir)
+        if NEWSLETTER_FILE.fullmatch(name) and name != today_name
+    ]
+    return len(prior) + 1
+
+
 # ── Offline test data, used only by --dry-run ───────────────────────────────
 # Shaped exactly like what rank_stories + summarize_rankings produce: each entry
 # has title/relevance_score, an attached original story (for the link), and a
@@ -320,12 +356,13 @@ def main():
     repo_root = os.path.dirname(script_dir)
     output_dir = os.path.join(repo_root, OUTPUT_DIR)
 
-    draft = render_newsletter(rankings)
+    issue = next_issue_number(output_dir)
+    draft = render_newsletter(rankings, issue_number=issue)
     filepath = save_newsletter(draft, output_dir)
 
     gaps = count_manual_gaps(rankings)
     filled = len(rankings) - gaps
-    print(f"Newsletter draft saved to: {filepath}")
+    print(f"Newsletter draft saved to: {filepath} (issue #{issue})")
     print(
         f"  {filled} of {len(rankings)} stories filled in Dara's voice"
         + (f"; {gaps} need a manual blurb (flagged inline)." if gaps else ".")

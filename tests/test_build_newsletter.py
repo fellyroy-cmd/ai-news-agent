@@ -29,6 +29,7 @@ from build_newsletter import (
     render_newsletter,
     count_manual_gaps,
     save_newsletter,
+    next_issue_number,
 )
 
 
@@ -169,3 +170,41 @@ def test_save_creates_the_output_dir_if_missing(tmp_path):
     nested = tmp_path / "content" / "newsletter"  # does not exist yet
     out = save_newsletter("hello", str(nested), date=datetime.date(2026, 8, 4))
     assert Path(out).exists()
+
+
+# ── next_issue_number() ──────────────────────────────────────────────────────
+
+def test_first_ever_issue_is_number_one_when_dir_is_missing(tmp_path):
+    missing = tmp_path / "content" / "newsletter"  # never created
+    assert next_issue_number(str(missing)) == 1
+
+
+def test_first_ever_issue_is_number_one_when_dir_is_empty(tmp_path):
+    (tmp_path).mkdir(exist_ok=True)
+    assert next_issue_number(str(tmp_path)) == 1
+
+
+def test_issue_number_is_one_past_the_count_of_prior_newsletters(tmp_path):
+    (tmp_path / "newsletter-2026-07-24.md").write_text("x", encoding="utf-8")
+    (tmp_path / "newsletter-2026-07-31.md").write_text("x", encoding="utf-8")
+    # today's file doesn't exist yet, so it's a brand-new issue: 2 prior → #3
+    assert next_issue_number(str(tmp_path), date=datetime.date(2026, 8, 7)) == 3
+
+
+def test_same_day_rerun_does_not_bump_the_issue_number(tmp_path):
+    # Two prior issues plus TODAY's already saved. Re-running must reuse #3, not
+    # jump to #4 — the same-day file is overwritten, not added as a new issue.
+    (tmp_path / "newsletter-2026-07-24.md").write_text("x", encoding="utf-8")
+    (tmp_path / "newsletter-2026-07-31.md").write_text("x", encoding="utf-8")
+    (tmp_path / "newsletter-2026-08-07.md").write_text("x", encoding="utf-8")
+    assert next_issue_number(str(tmp_path), date=datetime.date(2026, 8, 7)) == 3
+
+
+def test_issue_count_ignores_unrelated_files(tmp_path):
+    # Only newsletter-YYYY-MM-DD.md files count — not the research digests,
+    # a README, or a stray note that happens to share the folder.
+    (tmp_path / "newsletter-2026-07-24.md").write_text("x", encoding="utf-8")
+    (tmp_path / "digest-2026-07-24.md").write_text("x", encoding="utf-8")
+    (tmp_path / "README.md").write_text("x", encoding="utf-8")
+    (tmp_path / "notes.txt").write_text("x", encoding="utf-8")
+    assert next_issue_number(str(tmp_path), date=datetime.date(2026, 8, 7)) == 2
