@@ -28,6 +28,7 @@ from build_newsletter import (
     render_this_week_in_ai,
     render_newsletter,
     count_manual_gaps,
+    count_todos,
     save_newsletter,
     next_issue_number,
 )
@@ -155,6 +156,37 @@ def test_counts_only_the_stories_with_a_failed_blurb():
     assert count_manual_gaps([GOOD_ENTRY, FAILED_ENTRY, GOOD_ENTRY]) == 1
     assert count_manual_gaps([GOOD_ENTRY, GOOD_ENTRY]) == 0
     assert count_manual_gaps([FAILED_ENTRY, FAILED_ENTRY]) == 2
+
+
+# ── count_todos() ────────────────────────────────────────────────────────────
+
+def test_count_todos_counts_the_blanks_in_a_real_draft():
+    # A clean draft (every story blurb filled) still has the fixed human-touch
+    # blanks: 3 subject lines + preview + header opener + 6 tool-of-the-week
+    # fields (name, description, what/best-for/free/link) + 3 video fields
+    # (title, teaser, link) + 2 Skool fields + the closing question = 17.
+    draft = render_newsletter([GOOD_ENTRY], issue_number=1)
+    assert count_todos(draft) == 17
+
+
+def test_count_todos_includes_a_failed_blurb_gap():
+    # The failed-blurb story renders its own [TODO: write this blurb...], so a
+    # draft with one gap has exactly one more blank than the all-filled draft.
+    clean = count_todos(render_newsletter([GOOD_ENTRY], issue_number=1))
+    with_gap = count_todos(render_newsletter([GOOD_ENTRY, FAILED_ENTRY], issue_number=1))
+    assert with_gap == clean + 1
+
+
+def test_count_todos_total_is_never_less_than_the_manual_gap_count():
+    # The invariant the run summary relies on: the blank total always INCLUDES
+    # the story-blurb gaps, so it can never contradict count_manual_gaps().
+    rankings = [GOOD_ENTRY, FAILED_ENTRY, FAILED_ENTRY]
+    draft = render_newsletter(rankings, issue_number=1)
+    assert count_todos(draft) >= count_manual_gaps(rankings)
+
+
+def test_count_todos_is_zero_for_text_with_no_placeholders():
+    assert count_todos("nothing to fill in here") == 0
 
 
 # ── save_newsletter() ────────────────────────────────────────────────────────

@@ -195,6 +195,32 @@ def count_manual_gaps(rankings: list[dict]) -> int:
     return sum(1 for entry in rankings if entry.get("blurb") is None)
 
 
+# Every unfilled field render_newsletter emits — via TODO.format(...) — starts
+# with this exact marker. Counting it tells us the true size of the edit.
+TODO_MARKER = "[TODO:"
+
+
+def count_todos(text: str) -> int:
+    """Count the placeholder blanks still left to fill in a rendered draft.
+
+    Every unfilled field — the three subject lines, the preview text, the header
+    opener, the whole tool-of-the-week block, the video link, the Skool prompt,
+    the closing question, plus any failed-blurb story gap — renders as a
+    `[TODO: ...]` marker (see the TODO constant). Counting them turns the vague
+    "≤10-minute edit" into a concrete number Dara can see up front — both to know
+    how much work is left and to confirm nothing was accidentally left behind.
+
+    Like next_issue_number, this reports a FACT we can derive rather than leaving
+    Dara to eyeball it. The one thing to keep straight: this counts ALL the
+    blanks, so the total already INCLUDES the story-blurb gaps that
+    count_manual_gaps() reports on their own (a failed blurb is itself a TODO).
+    The run summary presents both without double-speak — N blanks total, of which
+    M are story blurbs you have to write yourself — so the numbers never look
+    like they're contradicting each other.
+    """
+    return text.count(TODO_MARKER)
+
+
 def save_newsletter(text: str, output_dir: str, date=None) -> str:
     """Write the rendered draft to content/newsletter/newsletter-YYYY-MM-DD.md.
 
@@ -294,10 +320,15 @@ def run_dry_run():
     print(draft)
 
     gaps = count_manual_gaps(SAMPLE_RANKINGS)
+    todos = count_todos(draft)
     print(
         f"\n\n{len(SAMPLE_RANKINGS)} stories assembled, "
         f"{gaps} {'needs' if gaps == 1 else 'need'} a manual blurb (auto-summary failed) — "
         "flagged inline above, not dropped."
+    )
+    print(
+        f"{todos} blanks ([TODO: ...]) left to fill in this draft — that's the whole "
+        "≤10-minute edit surface, story gaps included."
     )
     print("\nDry run complete. Nothing was written to disk; no API call was made.")
 
@@ -362,13 +393,25 @@ def main():
 
     gaps = count_manual_gaps(rankings)
     filled = len(rankings) - gaps
+    todos = count_todos(draft)
     print(f"Newsletter draft saved to: {filepath} (issue #{issue})")
     print(
         f"  {filled} of {len(rankings)} stories filled in Dara's voice"
         + (f"; {gaps} need a manual blurb (flagged inline)." if gaps else ".")
     )
-    print("  Human-touch sections (subject lines, tool of the week, video, Skool) left as TODOs.")
-    print("\nOpen the draft, fill the TODOs, and it should need ≤10 minutes before send.")
+    # The total blank count already includes any failed-blurb story gaps, so
+    # call those out inside the total rather than as a separate, competing number.
+    if gaps:
+        print(
+            f"  {todos} blanks left to fill — {gaps} of them story blurbs you write, "
+            "the rest the fixed human-touch fields (subject lines, tool of the week, video, Skool)."
+        )
+    else:
+        print(
+            f"  {todos} blanks left to fill — the fixed human-touch fields "
+            "(subject lines, tool of the week, video, Skool)."
+        )
+    print(f"\nOpen the draft, fill those {todos} TODOs, and it should need ≤10 minutes before send.")
 
 
 if __name__ == "__main__":
