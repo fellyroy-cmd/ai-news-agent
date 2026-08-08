@@ -221,6 +221,35 @@ def count_todos(text: str) -> int:
     return text.count(TODO_MARKER)
 
 
+def describe_blanks(total_blanks: int, story_gaps: int) -> str:
+    """One honest sentence describing the edit surface left in a draft.
+
+    Both entry points — the real run (main) and the offline preview (run_dry_run)
+    — need to tell Dara the same thing: how many [TODO:] blanks are left, and how
+    many of those are story blurbs she has to write herself. They used to say it
+    two different ways: main named the story-gap subset INSIDE the total ("18
+    blanks, 1 of them a story blurb"), while the dry run printed the gap count on
+    its own separate line and left the blank total to a second line — forcing the
+    reader to work out whether the two numbers overlapped. This helper is the
+    single source of that wording so the two runs can't drift again.
+
+    The invariant that makes it correct (same as count_todos' docstring):
+    total_blanks ALREADY includes story_gaps — a failed blurb is itself a
+    [TODO:]. So we always present the gaps as a named subset OF the total, never
+    as a competing number to add on. Singular/plural is handled so a lone blank
+    or a lone gap reads naturally.
+    """
+    blank_word = "blank" if total_blanks == 1 else "blanks"
+    fixed = "the fixed human-touch fields (subject lines, tool of the week, video, Skool)"
+    if story_gaps:
+        gap_word = "a story blurb you write" if story_gaps == 1 else "story blurbs you write"
+        return (
+            f"{total_blanks} {blank_word} left to fill — "
+            f"{story_gaps} of them {gap_word}, the rest {fixed}."
+        )
+    return f"{total_blanks} {blank_word} left to fill — {fixed}."
+
+
 def save_newsletter(text: str, output_dir: str, date=None) -> str:
     """Write the rendered draft to content/newsletter/newsletter-YYYY-MM-DD.md.
 
@@ -326,10 +355,10 @@ def run_dry_run():
         f"{gaps} {'needs' if gaps == 1 else 'need'} a manual blurb (auto-summary failed) — "
         "flagged inline above, not dropped."
     )
-    print(
-        f"{todos} blanks ([TODO: ...]) left to fill in this draft — that's the whole "
-        "≤10-minute edit surface, story gaps included."
-    )
+    # Same one-honest-number wording the real run uses, so the preview Dara sees
+    # first matches what a live run will tell her — the story gaps named as a
+    # subset of the total, not a second competing line.
+    print(describe_blanks(todos, gaps))
     print("\nDry run complete. Nothing was written to disk; no API call was made.")
 
 
@@ -400,17 +429,9 @@ def main():
         + (f"; {gaps} need a manual blurb (flagged inline)." if gaps else ".")
     )
     # The total blank count already includes any failed-blurb story gaps, so
-    # call those out inside the total rather than as a separate, competing number.
-    if gaps:
-        print(
-            f"  {todos} blanks left to fill — {gaps} of them story blurbs you write, "
-            "the rest the fixed human-touch fields (subject lines, tool of the week, video, Skool)."
-        )
-    else:
-        print(
-            f"  {todos} blanks left to fill — the fixed human-touch fields "
-            "(subject lines, tool of the week, video, Skool)."
-        )
+    # describe_blanks calls those out inside the total rather than as a separate,
+    # competing number — and the dry run now says it the exact same way.
+    print(f"  {describe_blanks(todos, gaps)}")
     print(f"\nOpen the draft, fill those {todos} TODOs, and it should need ≤10 minutes before send.")
 
 

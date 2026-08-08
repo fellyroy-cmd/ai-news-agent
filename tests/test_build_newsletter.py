@@ -29,6 +29,7 @@ from build_newsletter import (
     render_newsletter,
     count_manual_gaps,
     count_todos,
+    describe_blanks,
     save_newsletter,
     next_issue_number,
 )
@@ -187,6 +188,37 @@ def test_count_todos_total_is_never_less_than_the_manual_gap_count():
 
 def test_count_todos_is_zero_for_text_with_no_placeholders():
     assert count_todos("nothing to fill in here") == 0
+
+
+# ── describe_blanks() ────────────────────────────────────────────────────────
+
+def test_describe_blanks_names_story_gaps_as_a_subset_of_the_total():
+    # The 08-06 rule: the gap count must be presented INSIDE the total, never as
+    # a competing number. So the sentence carries the total AND names the gaps as
+    # "of them", so the reader never has to reconcile two figures.
+    line = describe_blanks(18, 1)
+    assert "18 blanks left to fill" in line
+    assert "1 of them a story blurb you write" in line
+
+
+def test_describe_blanks_pluralizes_multiple_story_gaps():
+    line = describe_blanks(19, 2)
+    assert "19 blanks left to fill" in line
+    assert "2 of them story blurbs you write" in line
+
+
+def test_describe_blanks_omits_the_story_clause_when_there_are_no_gaps():
+    # With every blurb filled, there's no story-gap subset to name — just the
+    # fixed human-touch fields. No "story blurb" wording should appear.
+    line = describe_blanks(17, 0)
+    assert "17 blanks left to fill" in line
+    assert "story blurb" not in line
+    assert "human-touch fields" in line
+
+
+def test_describe_blanks_uses_singular_blank_for_a_lone_blank():
+    assert "1 blank left to fill" in describe_blanks(1, 0)
+    assert "1 blanks" not in describe_blanks(1, 0)
 
 
 # ── save_newsletter() ────────────────────────────────────────────────────────
